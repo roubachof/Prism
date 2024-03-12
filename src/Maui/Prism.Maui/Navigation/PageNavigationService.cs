@@ -4,7 +4,9 @@ using Prism.Common;
 using Prism.Events;
 using Prism.Extensions;
 using Prism.Mvvm;
+using Prism.Navigation.Xaml;
 using Application = Microsoft.Maui.Controls.Application;
+using TabbedPage = Microsoft.Maui.Controls.TabbedPage;
 using XamlTab = Prism.Navigation.Xaml.TabbedPage;
 
 namespace Prism.Navigation;
@@ -66,6 +68,11 @@ public class PageNavigationService : INavigationService, IRegistryAware
         _pageAccessor = pageAccessor;
     }
 
+    public void UpdatePageAccessor(Page page)
+    {
+        _pageAccessor.Page = page;
+    }
+
     /// <summary>
     /// Navigates to the most recent entry in the back navigation history by popping the calling Page off the navigation stack.
     /// </summary>
@@ -100,10 +107,12 @@ public class PageNavigationService : INavigationService, IRegistryAware
                 var useModalForDoPop = UseModalGoBack(page, parameters);
                 var previousPage = MvvmHelpers.GetOnNavigatedToTarget(page, Window?.Page, useModalForDoPop);
 
-                bool? animated = null;
-                if (!parameters.TryGetValue<bool>(KnownNavigationParameters.Animated, out var globalAnimated))
+                bool? animated = parameters.ContainsKey(KnownNavigationParameters.Animated)
+                                     ? parameters.GetValue<bool>(KnownNavigationParameters.Animated)
+                                     : null;
+                if (animated == null && page is IModalPage modalPage)
                 {
-                    animated = true;
+                    animated = modalPage.Animate;
                 }
 
                 var poppedPage = await DoPop(page.Navigation, useModalForDoPop, animated ?? true);
@@ -111,7 +120,11 @@ public class PageNavigationService : INavigationService, IRegistryAware
                 {
                     MvvmHelpers.OnNavigatedFrom(page, parameters);
                     MvvmHelpers.OnNavigatedTo(previousPage, parameters);
-                    MvvmHelpers.DestroyPage(poppedPage);
+
+                    if (poppedPage is not ICacheable)
+                    {
+                        MvvmHelpers.DestroyPage(poppedPage);
+                    }
                 }
 
                 page = previousPage;
@@ -170,13 +183,24 @@ public class PageNavigationService : INavigationService, IRegistryAware
             bool useModalForDoPop = UseModalGoBack(page, parameters);
             Page previousPage = MvvmHelpers.GetOnNavigatedToTarget(page, Window?.Page, useModalForDoPop);
 
-            bool? animated = parameters.ContainsKey(KnownNavigationParameters.Animated) ? parameters.GetValue<bool>(KnownNavigationParameters.Animated) : null;
+            bool? animated = parameters.ContainsKey(KnownNavigationParameters.Animated)
+                                 ? parameters.GetValue<bool>(KnownNavigationParameters.Animated)
+                                 : null;
+            if (animated == null && page is IModalPage modalPage)
+            {
+                animated = modalPage.Animate;
+            }
+            
             var poppedPage = await DoPop(page.Navigation, useModalForDoPop, animated ?? true);
             if (poppedPage != null)
             {
                 MvvmHelpers.OnNavigatedFrom(page, parameters);
                 MvvmHelpers.OnNavigatedTo(previousPage, parameters);
-                MvvmHelpers.DestroyPage(poppedPage);
+
+                if (poppedPage is not ICacheable)
+                {
+                    MvvmHelpers.DestroyPage(poppedPage);   
+                }
 
                 return Notify(NavigationRequestType.GoBack, parameters);
             }
@@ -222,13 +246,20 @@ public class PageNavigationService : INavigationService, IRegistryAware
             pagesToDestroy.RemoveRange(index, pagesToDestroy.Count - index); // don't destroy pages from the go back page to the root page
             var pagesToRemove = pagesToDestroy.Skip(1).ToList(); // exclude the current page from the destroy pages
 
-            bool animated = parameters.ContainsKey(KnownNavigationParameters.Animated) ? parameters.GetValue<bool>(KnownNavigationParameters.Animated) : true;
+            bool? animated = parameters.ContainsKey(KnownNavigationParameters.Animated)
+                                 ? parameters.GetValue<bool>(KnownNavigationParameters.Animated)
+                                 : null;
+            if (animated == null && page is IModalPage modalPage)
+            {
+                animated = modalPage.Animate;
+            }
+            
             NavigationSource = PageNavigationSource.NavigationService;
             foreach(var removePage in pagesToRemove)
             {
                 page.Navigation.RemovePage(removePage);
             }
-            await page.Navigation.PopAsync(animated);
+            await page.Navigation.PopAsync(animated ?? true);
             NavigationSource = PageNavigationSource.Device;
 
             foreach (var destroyPage in pagesToDestroy)
@@ -321,9 +352,16 @@ public class PageNavigationService : INavigationService, IRegistryAware
             var root = pagesToDestroy.Last();
             pagesToDestroy.Remove(root); //don't destroy the root page
 
-            bool animated = parameters.ContainsKey(KnownNavigationParameters.Animated) ? parameters.GetValue<bool>(KnownNavigationParameters.Animated) : true;
+            bool? animated = parameters.ContainsKey(KnownNavigationParameters.Animated)
+                                 ? parameters.GetValue<bool>(KnownNavigationParameters.Animated)
+                                 : null;
+            if (animated == null && page is IModalPage modalPage)
+            {
+                animated = modalPage.Animate;
+            }
+            
             NavigationSource = PageNavigationSource.NavigationService;
-            await page.Navigation.PopToRootAsync(animated);
+            await page.Navigation.PopToRootAsync(animated ?? true);
             NavigationSource = PageNavigationSource.Device;
 
             foreach (var destroyPage in pagesToDestroy)
@@ -829,7 +867,10 @@ public class PageNavigationService : INavigationService, IRegistryAware
 
         await OnInitializedAsync(toPage, segmentParameters);
 
-        if (navigationAction != null)
+        // bool isPageCacheable = toPage is ICacheable;
+
+        bool isPageCacheable = false;
+        if (navigationAction != null && !isPageCacheable)
         {
             await navigationAction();
         }
@@ -839,6 +880,11 @@ public class PageNavigationService : INavigationService, IRegistryAware
         onNavigationActionCompleted?.Invoke(segmentParameters);
 
         OnNavigatedTo(toPage, segmentParameters);
+        
+        if (navigationAction != null && isPageCacheable)
+        {
+            await navigationAction();
+        }
     }
 
     static async Task OnInitializedAsync(Page toPage, INavigationParameters parameters)
@@ -1178,6 +1224,12 @@ public class PageNavigationService : INavigationService, IRegistryAware
             {
                 bool useModalForPush = UseModalNavigation(currentPage, useModalNavigation);
 
+                if (page is IModalPage modalPage)
+                {
+                    useModalForPush = true;
+                    animated ??= modalPage.Animate;
+                }
+                
                 if (useModalForPush)
                 {
                     await currentPage.Navigation.PushModalAsync(page, animated ?? true);
@@ -1236,7 +1288,9 @@ public class PageNavigationService : INavigationService, IRegistryAware
 
     internal bool UseModalGoBack(Page currentPage, INavigationParameters parameters)
     {
-        if (parameters.ContainsKey(KnownNavigationParameters.UseModalNavigation))
+        if (currentPage is IModalPage)
+            return true;
+        else if (parameters.ContainsKey(KnownNavigationParameters.UseModalNavigation))
             return parameters.GetValue<bool>(KnownNavigationParameters.UseModalNavigation);
         else if (currentPage is NavigationPage navPage)
             return GoBackModal(navPage);

@@ -5,6 +5,8 @@
 /// </summary>
 public interface INavigationService
 {
+    void UpdatePageAccessor(Page page);
+    
     /// <summary>
     /// Navigates to the most recent entry in the back navigation history by popping the calling Page off the navigation stack.
     /// </summary>
