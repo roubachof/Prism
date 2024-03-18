@@ -35,4 +35,31 @@ public static class NavigationRegistrationExtensions
 
         return container;
     }
+
+    public static IContainerRegistry RegisterForNavigation<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)] TView>(this IContainerRegistry container, Func<IContainerProvider, object> factoryMethod, string name = null)
+        where TView : Page =>
+        container.RegisterForNavigation(typeof(TView), null, factoryMethod, name);
+    
+    public static IContainerRegistry RegisterForNavigation(
+        this IContainerRegistry container,
+        Type view,
+        Type viewModel,
+        Func<IContainerProvider, object> factoryMethod,
+        string name = null)
+    {
+        if (view is null)
+            throw new ArgumentNullException(nameof(view));
+
+        if (string.IsNullOrEmpty(name))
+            name = view.Name;
+
+        container.RegisterInstance(
+                new ViewRegistration { Type = ViewType.Page, Name = name, View = view, ViewModel = viewModel })
+            .Register(view, factoryMethod);
+
+        if (viewModel != null)
+            container.Register(viewModel);
+
+        return container;
+    }
 }
