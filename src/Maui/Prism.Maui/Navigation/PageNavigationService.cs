@@ -115,7 +115,7 @@ public class PageNavigationService : INavigationService, IRegistryAware
                     animated = modalPage.Animate;
                 }
 
-                var poppedPage = await DoPop(page.Navigation, useModalForDoPop, animated ?? true);
+                var poppedPage = await DoPop(page.Navigation, useModalForDoPop, animated ?? DefaultNavigationParameters.Animate);
                 if (poppedPage != null)
                 {
                     MvvmHelpers.OnNavigatedFrom(page, parameters);
@@ -191,7 +191,7 @@ public class PageNavigationService : INavigationService, IRegistryAware
                 animated = modalPage.Animate;
             }
             
-            var poppedPage = await DoPop(page.Navigation, useModalForDoPop, animated ?? true);
+            var poppedPage = await DoPop(page.Navigation, useModalForDoPop, animated ?? DefaultNavigationParameters.Animate);
             if (poppedPage != null)
             {
                 MvvmHelpers.OnNavigatedFrom(page, parameters);
@@ -259,7 +259,7 @@ public class PageNavigationService : INavigationService, IRegistryAware
             {
                 page.Navigation.RemovePage(removePage);
             }
-            await page.Navigation.PopAsync(animated ?? true);
+            await page.Navigation.PopAsync(animated ?? DefaultNavigationParameters.Animate);
             NavigationSource = PageNavigationSource.Device;
 
             foreach (var destroyPage in pagesToDestroy)
@@ -361,7 +361,7 @@ public class PageNavigationService : INavigationService, IRegistryAware
             }
             
             NavigationSource = PageNavigationSource.NavigationService;
-            await page.Navigation.PopToRootAsync(animated ?? true);
+            await page.Navigation.PopToRootAsync(animated ?? DefaultNavigationParameters.Animate);
             NavigationSource = PageNavigationSource.Device;
 
             foreach (var destroyPage in pagesToDestroy)
@@ -1232,7 +1232,7 @@ public class PageNavigationService : INavigationService, IRegistryAware
                 
                 if (useModalForPush)
                 {
-                    await currentPage.Navigation.PushModalAsync(page, animated ?? true);
+                    await currentPage.Navigation.PushModalAsync(page, animated ?? DefaultNavigationParameters.Animate);
                 }
                 else
                 {
@@ -1242,7 +1242,7 @@ public class PageNavigationService : INavigationService, IRegistryAware
                     }
                     else
                     {
-                        await currentPage.Navigation.PushAsync(page, animated ?? true);
+                        await currentPage.Navigation.PushAsync(page, animated ?? DefaultNavigationParameters.Animate);
                     }
                 }
             }

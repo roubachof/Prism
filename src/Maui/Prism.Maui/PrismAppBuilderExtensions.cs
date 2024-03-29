@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Prism.Modularity;
 using Prism.Mvvm;
 using Prism.Navigation;
@@ -225,6 +225,12 @@ public static class PrismAppBuilderExtensions
                     });
                 });
         });
+        return builder;
+    }
+
+    public static PrismAppBuilder ConfigureDefaultNavigationParameters(this PrismAppBuilder builder, bool animate)
+    {
+        DefaultNavigationParameters.Animate = animate;
         return builder;
     }
 }
